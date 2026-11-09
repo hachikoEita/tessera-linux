@@ -16,7 +16,10 @@
 # Or, on a Debian trixie host that has the packages installed below (as F-Droid's build server
 # does, from its recipe), without a build root or root:
 #   TESSERA_ON_HOST=1 scripts/gpu/build-mesa.sh
-# Env: MESA_VERSION (default below), TRIXIE (the build root, default /opt/trixie).
+# Env: MESA_VERSION (default below), TRIXIE (the build root, default /opt/trixie),
+# MESA_SHA256 (the release tarball's SHA-256; default: scripts/gpu/mesa.sha256, which is for
+# the default MESA_VERSION). The build refuses to run without a hash, or if the download
+# doesn't match it.
 set -euo pipefail
 
 MESA_VERSION=${MESA_VERSION:-26.2.4}
@@ -25,6 +28,16 @@ PREFIX=/opt/tessera-gpu
 HERE=$(cd "$(dirname "$0")" && pwd)
 OUT="$HERE/../../build/gpu/assets/gpu"
 ON_HOST=${TESSERA_ON_HOST:-}
+# The SHA-256 the Mesa tarball must have: from the environment, else from mesa.sha256.
+if [ -z "${MESA_SHA256:-}" ] && [ -f "$HERE/mesa.sha256" ]; then
+  MESA_SHA256=$(awk 'NF { print $1; exit }' "$HERE/mesa.sha256")
+fi
+MESA_SHA256=$(printf '%s' "${MESA_SHA256:-}" | tr 'A-F' 'a-f')
+if ! [[ "$MESA_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "build-mesa.sh: no valid SHA-256 for mesa-$MESA_VERSION.tar.xz;" \
+    "set MESA_SHA256 or put it in scripts/gpu/mesa.sha256" >&2
+  exit 1
+fi
 # Where the build works: in the build root, or a folder of our own on the host.
 if [ -n "$ON_HOST" ]; then
   mkdir -p "$HERE/../../build/gpu-work"
@@ -59,7 +72,18 @@ apt-get install -y -qq --no-install-recommends \
 fi
 
 mkdir -p \$WORK/src && cd \$WORK/src
-[ -d mesa-$MESA_VERSION ] || curl -fsSL https://archive.mesa3d.org/mesa-$MESA_VERSION.tar.xz | tar xJ
+# Download to a file and check its SHA-256 before unpacking; a mismatch stops the build.
+if [ ! -d mesa-$MESA_VERSION ]; then
+  rm -f mesa-$MESA_VERSION.tar.xz
+  curl -fsSL -o mesa-$MESA_VERSION.tar.xz https://archive.mesa3d.org/mesa-$MESA_VERSION.tar.xz
+  if ! echo "$MESA_SHA256  mesa-$MESA_VERSION.tar.xz" | sha256sum -c -; then
+    echo "mesa-$MESA_VERSION.tar.xz does not match the expected SHA-256; refusing to build" >&2
+    rm -f mesa-$MESA_VERSION.tar.xz
+    exit 1
+  fi
+  tar xJf mesa-$MESA_VERSION.tar.xz
+  rm -f mesa-$MESA_VERSION.tar.xz
+fi
 cd mesa-$MESA_VERSION
 # Our fixes (scripts/gpu/patches). One a reused source tree already has is skipped; one that
 # doesn't apply stops the build, rather than shipping a driver without it.
