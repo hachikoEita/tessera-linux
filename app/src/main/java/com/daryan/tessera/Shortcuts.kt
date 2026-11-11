@@ -99,13 +99,91 @@ data class Shortcut(
             packages = listOf("curl", "ca-certificates", "git"),
             description = "Anthropic's coding agent, in a terminal. Knows how Tessera works, and reads what just failed.",
         )
+
+        /**
+         * OpenDesign, the AI design tool, run from the user's own fork (hachikoEita/open-design,
+         * branch tessera-n6). The first run installs everything with no root: Node 24 from nodejs.org
+         * (checked against the published SHA-256), pnpm, then the project in copy mode. Copy mode matters
+         * here: PRoot fakes hard links with hidden .l2s.* files, which breaks pnpm's default store and
+         * makes the TypeScript compiler fail at random. Later runs start the engine straight away on
+         * fixed ports, so the address never changes. Open it in the browser; nothing signs in anywhere.
+         */
+        val OPEN_DESIGN = Shortcut(
+            id = "open-design",
+            name = "OpenDesign",
+            command = script(
+                """
+                export PATH="§HOME/.local/node/bin:§HOME/.local/bin:§PATH"
+                OD="§HOME/open-design"
+                WEB=17575
+                DAEMON=17576
+                fail() { echo; echo "§1"; echo "Fix the problem above, then open OpenDesign again."; exec bash -l; }
+
+                if ! { command -v node >/dev/null 2>&1 && node -v | grep -q '^v24[.]'; }; then
+                  echo "Installing Node 24 (first run only)..."
+                  base=https://nodejs.org/dist/latest-v24.x
+                  tmp=§(mktemp -d)
+                  cd "§tmp" || fail "No temporary folder."
+                  curl -fsSL "§base/SHASUMS256.txt" -o sums || fail "Could not download the Node checksum list."
+                  f=§(awk '/linux-arm64[.]tar[.]xz§/ {print §2}' sums)
+                  [ -n "§f" ] || fail "Could not find Node for this phone."
+                  curl -fsSL "§base/§f" -o "§f" || fail "Could not download Node."
+                  grep " §f§" sums | sha256sum -c - || fail "Node did not match its published checksum."
+                  rm -rf "§HOME/.local/node" && mkdir -p "§HOME/.local/node" \
+                    && tar -xJf "§f" -C "§HOME/.local/node" --strip-components=1 || fail "Could not unpack Node."
+                  cd ~ && rm -rf "§tmp"
+                fi
+
+                if ! command -v pnpm >/dev/null 2>&1; then
+                  echo "Installing pnpm (first run only)..."
+                  npm install -g pnpm@10.33.2 --prefix "§HOME/.local" || fail "Could not install pnpm."
+                fi
+
+                if [ ! -d "§OD/.git" ]; then
+                  echo "Downloading OpenDesign (first run only)..."
+                  git clone --depth 1 --branch tessera-n6 https://github.com/hachikoEita/open-design.git "§OD" || fail "Could not download OpenDesign."
+                fi
+
+                cd "§OD" || fail "OpenDesign folder is missing."
+                if [ ! -f .tessera-installed ]; then
+                  echo "Installing OpenDesign (first run only, about 15 to 30 minutes)..."
+                  pnpm install --ignore-scripts --config.package-import-method=copy || fail "The install failed."
+                  node scripts/postinstall.mjs build || fail "The build failed."
+                  touch .tessera-installed
+                fi
+
+                echo
+                echo "OpenDesign is starting. When it says ready, open this in your browser:"
+                echo "  http://localhost:§WEB/"
+                echo "Do not press Sign up or Log in there. Use Local AI, then OpenCode."
+                echo
+                exec pnpm tools-dev run web --web-port §WEB --daemon-port §DAEMON
+                """,
+            ),
+            icon = "palette",
+            packages = listOf("curl", "ca-certificates", "git", "xz-utils", "build-essential", "python3"),
+            description = "AI design tool, from your own fork. Starts a local page; open it in your browser.",
+        )
+
+        /** A shell script written with § where it needs a literal dollar sign. */
+        private fun script(text: String) = text.trimIndent().replace('§', '\u0024')
     }
 }
 
-/** The user's shortcuts, in [file]; starts with Claude Code. */
+/** The user's shortcuts, in [file]; starts with Claude Code and OpenDesign. */
 class ShortcutStore(private val file: File) {
     private val _shortcuts = MutableStateFlow(load())
     val shortcuts: StateFlow<List<Shortcut>> = _shortcuts
+
+    /** Remembers that OpenDesign was added once, so deleting it stays deleted. */
+    private val offered = File(file.parentFile, file.name + ".open-design-offered")
+
+    init {
+        if (!offered.exists()) {
+            if (_shortcuts.value.none { it.id == Shortcut.OPEN_DESIGN.id }) edit { it + Shortcut.OPEN_DESIGN }
+            runCatching { offered.parentFile?.mkdirs(); offered.writeText("1") }
+        }
+    }
 
     /** Adds [shortcut], or replaces the one with its id. */
     fun save(shortcut: Shortcut) = edit { list ->

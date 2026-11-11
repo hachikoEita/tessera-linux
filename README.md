@@ -340,7 +340,8 @@ with its own Recents card, theme, sound, GPU and per-app permissions.
 - **Terminal** and **Root shell**: a full Linux shell, [like Termux](#-a-full-linux-shell-like-termux-and-anlinux-and-andronix-in-one),
   with extra keys and pinch to zoom.
 - **Shortcuts:** your own commands as icons, in a terminal or a window, optionally as root.
-  Comes with Claude Code, which installs itself on first run.
+  Comes with Claude Code, which installs itself on first run, and (personal fork) OpenDesign, an AI
+  design tool run from the fork's own copy, which also installs itself on first run.
 - **Apps installed any way show up:** apt in a terminal, a downloaded .deb, all listed.
 - **Missing a library?** When an app stops for a missing library, program, Python module or
   GObject typelib, Tessera says what it needs, finds the Debian package with it, installs it and
