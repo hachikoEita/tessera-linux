@@ -149,7 +149,13 @@ data class Shortcut(
                   echo "Installing OpenDesign (first run only, about 15 to 30 minutes)..."
                   pnpm install --ignore-scripts --config.package-import-method=copy || fail "The install failed."
                   node scripts/postinstall.mjs build || fail "The build failed."
+                  node scripts/postinstall.mjs dependencies || fail "The database part failed to build."
                   touch .tessera-installed
+                fi
+
+                if ! command -v opencode >/dev/null 2>&1; then
+                  echo "Installing OpenCode (first run only)..."
+                  npm install -g opencode-ai --prefix "§HOME/.local" || echo "OpenCode did not install. Try again later: npm install -g opencode-ai --prefix ~/.local"
                 fi
 
                 echo
