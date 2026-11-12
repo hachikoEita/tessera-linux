@@ -52,7 +52,8 @@ class WebWindowActivity : ComponentActivity() {
                             "<html><body style='font-family:sans-serif;padding:24px'>" +
                                 "<h2>Can't reach $title</h2>" +
                                 "<p>Is the $title terminal still running? Start it from the Apps tab, " +
-                                "wait until it says it is ready, then open this window again.</p></body></html>",
+                                "wait until it says it is ready, then open this window again.</p>" +
+                                "<p style='color:#666'>Reason: ${error.description} (code ${error.errorCode}) for $url</p></body></html>",
                             "text/html", "utf-8",
                         )
                     }
