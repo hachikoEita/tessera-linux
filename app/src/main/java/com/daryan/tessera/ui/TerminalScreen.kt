@@ -29,6 +29,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.ui.platform.LocalContext
+import com.daryan.tessera.WebWindowActivity
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -66,6 +68,7 @@ fun TerminalScreen(
     BackHandler(onBack = onBack)
 
     val density = LocalDensity.current
+    val context = LocalContext.current
     var textPx by remember { mutableStateOf(with(density) { 13.dp.roundToPx() }) }
     val modifiers = remember { Modifiers() }
     var view by remember { mutableStateOf<TerminalView?>(null) }
@@ -99,6 +102,12 @@ fun TerminalScreen(
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                 )
+            }
+            if (session.running && session.app.name == "OpenDesign") {
+                FilledTonalButton(
+                    onClick = { WebWindowActivity.open(context, "http://127.0.0.1:17575/", "OpenDesign") },
+                    modifier = Modifier.padding(end = 8.dp),
+                ) { Text("Open window") }
             }
             if (session.running) {
                 FilledTonalButton(onClick = onStop, modifier = Modifier.padding(end = 8.dp)) {
